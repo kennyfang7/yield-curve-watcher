@@ -1,0 +1,6 @@
+economies: ["US"]
+lookback_days: 1095  # 3 years
+fetcher: "US_FRED"
+indicators: ["yieldcurve", "credit_us"]
+signals: ["composite_default", "logit_recession"]
+notifier: "console"
