@@ -1,0 +1,13 @@
+Metadata-Version: 2.4
+Name: yieldcurvewatch
+Version: 0.2.0
+Summary: Modular yield-curve & credit-spread alerting, with logit probability and dashboard
+Requires-Python: >=3.10
+Requires-Dist: pandas
+Requires-Dist: requests
+Requires-Dist: PyYAML
+Requires-Dist: scikit-learn
+Requires-Dist: python-dateutil
+Requires-Dist: typing_extensions
+Requires-Dist: streamlit
+Requires-Dist: altair

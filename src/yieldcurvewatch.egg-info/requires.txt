@@ -1,0 +1,8 @@
+pandas
+requests
+PyYAML
+scikit-learn
+python-dateutil
+typing_extensions
+streamlit
+altair
