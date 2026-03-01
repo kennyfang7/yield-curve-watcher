@@ -8,6 +8,7 @@ version = "0.2.0"
 description = "Modular yield-curve & credit-spread alerting, with logit probability and dashboard"
 requires-python = ">=3.10"
 dependencies = [
+    "numpy>=1.26",
     "pandas",
     "requests",
     "PyYAML",

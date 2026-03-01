@@ -18,7 +18,11 @@ class YieldCurveIndicators(BaseIndicator):
             series["slope_10Y_3M_bps"] = slope_10_3m
             d10 = df["10Y"].diff() * 100.0
             series["d10_bps"] = d10
-            features["jump_10Y_last5d_bps"] = float(d10.tail(5).abs().max()) if d10.notna().any() else float("nan")
+            # Net 5-day cumulative move (absolute magnitude) — catches sustained
+            # directional moves rather than a single volatile day in a quiet week.
+            features["jump_10Y_last5d_bps"] = (
+                abs(float(d10.tail(5).sum())) if d10.notna().any() else float("nan")
+            )
             if len(df) >= 200:
                 ma200 = df["10Y"].rolling(200).mean()
                 prev = df["10Y"].shift(1) - ma200.shift(1)

@@ -1,9 +1,9 @@
-import os, math
+import os
 import pandas as pd
-import requests
 from datetime import date
 from ..types import CurveFetcherResult
 from .base import BaseFetcher
+from ..utils.fred import fetch_fred_series
 
 FRED_SERIES = {
     "1M":  "DGS1MO",
@@ -19,21 +19,30 @@ FRED_SERIES = {
     "30Y": "DGS30",
 }
 
+# Maximum number of consecutive days to forward-fill; avoids propagating
+# arbitrarily stale rates across extended data outages.
+_FFILL_LIMIT = 10
+
+
 class USFredFetcher(BaseFetcher):
     economy = "US"
+
     def __init__(self, api_key: str | None = None):
         self.api_key = api_key or os.getenv("FRED_API_KEY")
         if not self.api_key:
             raise RuntimeError("FRED_API_KEY not found. export FRED_API_KEY=...")
-    def _series(self, sid: str, start: date, end: date) -> pd.Series:
-        url = "https://api.stlouisfed.org/fred/series/observations"
-        params = {"series_id": sid, "api_key": self.api_key, "file_type": "json",
-                  "observation_start": start.isoformat(), "observation_end": end.isoformat()}
-        r = requests.get(url, params=params, timeout=30); r.raise_for_status()
-        data = r.json()["observations"]
-        s = pd.Series({pd.to_datetime(x["date"]): (float(x["value"]) if x["value"] not in (".", None) else math.nan) for x in data}, name=sid)
-        return s
+
     def fetch(self, start: date, end: date) -> CurveFetcherResult:
-        series = {tenor: self._series(sid, start, end) for tenor, sid in FRED_SERIES.items()}
-        df = pd.DataFrame(series).sort_index().ffill().dropna(how="all")
+        series = {
+            tenor: fetch_fred_series(
+                sid, start.isoformat(), end.isoformat(), self.api_key
+            )
+            for tenor, sid in FRED_SERIES.items()
+        }
+        df = (
+            pd.DataFrame(series)
+            .sort_index()
+            .ffill(limit=_FFILL_LIMIT)
+            .dropna(how="all")
+        )
         return CurveFetcherResult(df=df, economy=self.economy)
