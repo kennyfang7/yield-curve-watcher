@@ -195,9 +195,10 @@ class TestUSCreditIndicators:
             return pd.Series(vals, index=df.index, name="BAMLH0A0HYM2")
         raise ValueError(f"Unexpected series: {sid}")
 
-    @patch("ycw.indicators.credit.fetch_fred_series")
-    def test_baa_minus_10y_computed(self, mock_fetch):
+    @patch("ycw.cache.fetch_fred_series")
+    def test_baa_minus_10y_computed(self, mock_fetch, tmp_path):
         from ycw.indicators.credit import USCreditIndicators
+        from ycw.cache import FredCache
 
         df = _make_curve_df()
         df["10Y"] = 4.1  # fixed 10Y
@@ -207,15 +208,17 @@ class TestUSCreditIndicators:
 
         mock_fetch.side_effect = _side_effect
 
-        ind = USCreditIndicators(api_key="test")
+        cache = FredCache("test", cache_dir=tmp_path)
+        ind = USCreditIndicators(api_key="test", cache=cache)
         out = ind.compute("US", df)
 
         # BAA=5.5, 10Y=4.1 → spread = (5.5-4.1)*100 = 140 bps
         assert abs(out.features["baa_minus_10y_bps"] - 140.0) < 1.0
 
-    @patch("ycw.indicators.credit.fetch_fred_series")
-    def test_hy_oas_present(self, mock_fetch):
+    @patch("ycw.cache.fetch_fred_series")
+    def test_hy_oas_present(self, mock_fetch, tmp_path):
         from ycw.indicators.credit import USCreditIndicators
+        from ycw.cache import FredCache
 
         df = _make_curve_df()
 
@@ -224,7 +227,8 @@ class TestUSCreditIndicators:
 
         mock_fetch.side_effect = _side_effect
 
-        ind = USCreditIndicators(api_key="test")
+        cache = FredCache("test", cache_dir=tmp_path)
+        ind = USCreditIndicators(api_key="test", cache=cache)
         out = ind.compute("US", df)
 
         assert "hy_oas_bps" in out.features
@@ -569,7 +573,7 @@ class TestLogitRecessionSignal:
             return pd.Series(vals, index=idx, name=sid)
         raise ValueError(sid)
 
-    @patch("ycw.signals.logit_recession.fetch_fred_series")
+    @patch("ycw.cache.fetch_fred_series")
     def test_returns_signal_list(self, mock_fetch):
         from ycw.signals.logit_recession import LogitRecessionSignal
 
@@ -582,8 +586,7 @@ class TestLogitRecessionSignal:
         assert isinstance(result, list)
         assert all(hasattr(s, "level") for s in result)
 
-    @patch("ycw.signals.logit_recession.fetch_fred_series")
-    def test_missing_api_key_returns_watch(self, mock_fetch):
+    def test_missing_api_key_returns_watch(self):
         from ycw.signals.logit_recession import LogitRecessionSignal
 
         env = {k: v for k, v in os.environ.items() if k != "FRED_API_KEY"}
@@ -592,7 +595,7 @@ class TestLogitRecessionSignal:
 
         assert result[0].code == "logit_missing_key"
 
-    @patch("ycw.signals.logit_recession.fetch_fred_series")
+    @patch("ycw.cache.fetch_fred_series")
     def test_fetch_error_returns_watch_signal(self, mock_fetch):
         from ycw.signals.logit_recession import LogitRecessionSignal
 
@@ -602,8 +605,7 @@ class TestLogitRecessionSignal:
 
         assert result[0].code == "logit_error"
 
-    @patch("ycw.signals.logit_recession.fetch_fred_series")
-    def test_inherits_base_signal(self, _):
+    def test_inherits_base_signal(self):
         from ycw.signals.logit_recession import LogitRecessionSignal
         from ycw.signals.base import BaseSignal
 

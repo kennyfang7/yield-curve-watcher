@@ -1,7 +1,8 @@
-import argparse, json
+import argparse, json, os
 from .config import load_config
 from .registry import Registry
 from .pipeline import run_pipeline
+from .cache import FredCache
 
 # force imports to register
 from .fetchers.fred_us import USFredFetcher
@@ -14,6 +15,10 @@ from .notifiers.slack_webhook import SlackWebhookNotifier
 
 def build_registry():
     reg = Registry()
+    api_key = os.getenv("FRED_API_KEY")
+    # Shared cache for all FRED-backed components.  FredCache reads
+    # FRED_CACHE_DIR from the environment when no explicit path is given.
+    reg.shared_cache = FredCache(api_key) if api_key else None
     reg.register_fetcher("US_FRED", USFredFetcher)
     reg.register_indicator("yieldcurve", YieldCurveIndicators)
     reg.register_indicator("credit_us", USCreditIndicators)
