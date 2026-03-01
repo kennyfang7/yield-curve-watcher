@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import date
 from ..types import CurveFetcherResult
 from .base import BaseFetcher
-from ..utils.fred import fetch_fred_series
+from ..cache import FredCache
 
 FRED_SERIES = {
     "1M":  "DGS1MO",
@@ -27,16 +27,15 @@ _FFILL_LIMIT = 10
 class USFredFetcher(BaseFetcher):
     economy = "US"
 
-    def __init__(self, api_key: str | None = None):
+    def __init__(self, api_key: str | None = None, cache: FredCache | None = None):
         self.api_key = api_key or os.getenv("FRED_API_KEY")
         if not self.api_key:
             raise RuntimeError("FRED_API_KEY not found. export FRED_API_KEY=...")
+        self._cache = cache or FredCache(self.api_key)
 
     def fetch(self, start: date, end: date) -> CurveFetcherResult:
         series = {
-            tenor: fetch_fred_series(
-                sid, start.isoformat(), end.isoformat(), self.api_key
-            )
+            tenor: self._cache.get(sid, start.isoformat(), end.isoformat())
             for tenor, sid in FRED_SERIES.items()
         }
         df = (

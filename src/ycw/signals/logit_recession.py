@@ -9,7 +9,7 @@ from typing import List, Dict
 
 from ..types import Signal
 from .base import BaseSignal
-from ..utils.fred import fetch_fred_series
+from ..cache import FredCache
 
 logger = logging.getLogger(__name__)
 
@@ -19,23 +19,25 @@ SERIES = {"DGS10": "DGS10", "DGS3MO": "DGS3MO", "USREC": "USREC"}
 class LogitRecessionSignal(BaseSignal):
     name = "logit_recession"
 
-    def __init__(self, horizon_months: int = 12):
+    def __init__(self, horizon_months: int = 12, cache: FredCache | None = None):
         self.h = horizon_months
         self._cached_prob: float | None = None
+        self._cache = cache  # Resolved lazily in _train_and_nowcast if None.
 
     def _train_and_nowcast(self, api_key: str) -> float:
         if self._cached_prob is not None:
             return self._cached_prob
 
+        cache = self._cache or FredCache(api_key)
         start = "1962-01-01"
         end = pd.Timestamp.today().strftime("%Y-%m-%d")
 
-        d10 = fetch_fred_series(SERIES["DGS10"], start, end, api_key)
-        d3m = fetch_fred_series(SERIES["DGS3MO"], start, end, api_key)
+        d10 = cache.get(SERIES["DGS10"], start, end)
+        d3m = cache.get(SERIES["DGS3MO"], start, end)
 
         # USREC missing values should not be silently treated as "no recession".
         # Keep them as NaN so they are excluded from training labels.
-        rec_raw = fetch_fred_series(SERIES["USREC"], start, end, api_key)
+        rec_raw = cache.get(SERIES["USREC"], start, end)
         rec = rec_raw.resample("ME").last()
 
         curve = (d10 - d3m)

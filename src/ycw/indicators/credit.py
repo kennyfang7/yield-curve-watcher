@@ -2,7 +2,7 @@ import os
 import pandas as pd
 from ..types import IndicatorResult
 from .base import BaseIndicator
-from ..utils.fred import fetch_fred_series
+from ..cache import FredCache
 
 SERIES = {"BAA_YIELD": "BAA", "HY_OAS": "BAMLH0A0HYM2"}
 
@@ -13,10 +13,11 @@ _FFILL_LIMIT = 10
 class USCreditIndicators(BaseIndicator):
     name = "credit_us"
 
-    def __init__(self, api_key: str | None = None):
+    def __init__(self, api_key: str | None = None, cache: FredCache | None = None):
         self.api_key = api_key or os.getenv("FRED_API_KEY")
         if not self.api_key:
             raise RuntimeError("FRED_API_KEY not found for credit indicators.")
+        self._cache = cache or FredCache(self.api_key)
 
     def compute(self, economy: str, df: pd.DataFrame) -> IndicatorResult:
         # Validate early before making any network calls.
@@ -28,8 +29,8 @@ class USCreditIndicators(BaseIndicator):
         start = df.index.min().date().isoformat()
         end = df.index.max().date().isoformat()
 
-        baa = fetch_fred_series(SERIES["BAA_YIELD"], start, end, self.api_key)
-        hy = fetch_fred_series(SERIES["HY_OAS"], start, end, self.api_key)
+        baa = self._cache.get(SERIES["BAA_YIELD"], start, end)
+        hy = self._cache.get(SERIES["HY_OAS"], start, end)
 
         # Reuse DGS10 already fetched by USFredFetcher (stored as "10Y" column).
         # This avoids a redundant HTTP request and ensures temporal alignment.
