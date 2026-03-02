@@ -23,6 +23,7 @@ class Signal:
     level: str     # "info", "watch", "warning"
     code: str
     message: str
+    economy: str = ""
 
 
 @dataclass

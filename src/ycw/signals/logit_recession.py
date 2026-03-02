@@ -77,6 +77,7 @@ class LogitRecessionSignal(BaseSignal):
                 level="watch",
                 code="logit_missing_key",
                 message=f"[{economy}] Set FRED_API_KEY to compute logit recession probability",
+                economy=economy,
             )]
         try:
             p = self._train_and_nowcast(api_key)
@@ -86,6 +87,7 @@ class LogitRecessionSignal(BaseSignal):
                 level="watch",
                 code="logit_error",
                 message=f"[{economy}] Logit model error — see logs for details",
+                economy=economy,
             )]
 
         if math.isnan(p):
@@ -93,6 +95,7 @@ class LogitRecessionSignal(BaseSignal):
                 level="info",
                 code="logit_na",
                 message=f"[{economy}] Logit probability unavailable",
+                economy=economy,
             )]
 
         sigs: List[Signal] = []
@@ -100,17 +103,20 @@ class LogitRecessionSignal(BaseSignal):
             level="info",
             code="logit_prob",
             message=f"[{economy}] Recession probability (next {self.h}m): {p * 100:.1f}%",
+            economy=economy,
         ))
         if p >= 0.5:
             sigs.append(Signal(
                 level="warning",
                 code="logit_high",
                 message=f"[{economy}] High recession risk per logit ({p * 100:.1f}%)",
+                economy=economy,
             ))
         elif p >= 0.3:
             sigs.append(Signal(
                 level="watch",
                 code="logit_watch",
                 message=f"[{economy}] Elevated recession risk per logit ({p * 100:.1f}%)",
+                economy=economy,
             ))
         return sigs
