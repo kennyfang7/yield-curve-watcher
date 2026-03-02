@@ -4,6 +4,7 @@ from datetime import date, timedelta
 from typing import Dict, Any, List
 import pandas as pd
 from .registry import Registry
+from .signal_history import SignalHistory
 from .types import Signal
 
 logger = logging.getLogger(__name__)
@@ -67,6 +68,8 @@ def run_pipeline(reg: Registry, cfg: Dict[str, Any]) -> Dict[str, Any]:
 
     results: Dict[str, Any] = {}
 
+    history = SignalHistory(ttl_days=int(cfg.get("alert_ttl_days", 7)))
+
     for econ in economies:
         res = fetcher.fetch(start, today)
         df = res.df
@@ -86,7 +89,8 @@ def run_pipeline(reg: Registry, cfg: Dict[str, Any]) -> Dict[str, Any]:
             except Exception:
                 logger.exception("Signal '%s' failed for economy '%s'", sm.name, econ)
 
-        notifier.notify(sigs)
+        new_sigs = history.filter_and_update(sigs)
+        notifier.notify(new_sigs)
 
         if df.empty or df.index.empty:
             latest_date = "N/A"

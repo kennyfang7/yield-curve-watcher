@@ -423,7 +423,7 @@ class TestRunPipeline:
         class FakeSignal(BaseSignal):
             name = "fake_sig"
             def evaluate(self, economy, f):
-                return [Signal(level="info", code="ok", message=f"{economy} ok")]
+                return [Signal(level="info", code="ok", message=f"{economy} ok", economy=economy)]
 
         class FakeNotifier(BaseNotifier):
             def notify(self, signals): pass
