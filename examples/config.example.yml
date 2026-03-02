@@ -4,3 +4,4 @@ fetcher: "US_FRED"
 indicators: ["yieldcurve", "credit_us"]
 signals: ["composite_default", "logit_recession"]
 notifier: "console"
+alert_ttl_days: 7  # re-notify after this many days of continuous signal activity
