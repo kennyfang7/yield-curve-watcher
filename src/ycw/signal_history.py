@@ -117,9 +117,17 @@ class SignalHistory:
                 else:
                     self._history[k]["last_seen"] = now_str
 
+        # Mark signals inactive only for economies present in this batch.
+        # When the batch carries at least one economy, scope deactivation to
+        # those economies only, so a per-economy pipeline call does not
+        # accidentally clear signals from unrelated economies.
+        # When the batch is empty, fall back to deactivating all active signals
+        # (the original behaviour), preserving the "signal cleared" semantic.
+        current_economies = {s.economy for s in current_signals}
         for k in list(self._history):
             if self._history[k]["active"] and k not in current_keys:
-                self._history[k]["active"] = False
+                if not current_economies or k.split("|")[-1] in current_economies:
+                    self._history[k]["active"] = False
 
         self._save()
 

@@ -162,3 +162,26 @@ class TestEconomyIsolation:
         result = h2.filter_new([us_sig, uk_sig])
         assert us_sig not in result
         assert uk_sig in result
+
+    def test_multi_economy_single_instance_no_cross_deactivation(self, tmp_path):
+        """Single SignalHistory instance called per-economy (as pipeline does) must not
+        mark other economies' signals inactive."""
+        from ycw.signal_history import SignalHistory
+
+        p = tmp_path / "hist.json"
+        us_sig = _sig(economy="US")
+        uk_sig = _sig(economy="UK")
+
+        h = SignalHistory(path=p)
+
+        # Simulate pipeline loop: US economy first, then UK
+        h.filter_and_update([us_sig])   # US fires and is stored as active
+        h.filter_and_update([uk_sig])   # UK fires — must NOT deactivate US
+
+        # Reload from disk to simulate next day
+        h2 = SignalHistory(path=p)
+        result = h2.filter_new([us_sig, uk_sig])
+
+        # Both should be suppressed (neither cleared nor TTL expired)
+        assert us_sig not in result, "US signal was incorrectly reactivated by UK run"
+        assert uk_sig not in result, "UK signal was incorrectly reactivated"
