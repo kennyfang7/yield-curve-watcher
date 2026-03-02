@@ -46,7 +46,7 @@ class SignalHistory:
 
     def _load(self) -> dict:
         try:
-            with open(self._path) as f:
+            with open(self._path, encoding="utf-8") as f:
                 return json.load(f)
         except FileNotFoundError:
             return {}
@@ -61,7 +61,7 @@ class SignalHistory:
     def _save(self) -> None:
         try:
             self._path.parent.mkdir(parents=True, exist_ok=True)
-            with open(self._path, "w") as f:
+            with open(self._path, "w", encoding="utf-8") as f:
                 json.dump(self._history, f, indent=2)
         except Exception as exc:
             logger.warning("SignalHistory: failed to write %s (%s)", self._path, exc)
@@ -70,9 +70,15 @@ class SignalHistory:
     def _key(sig: Signal) -> str:
         return f"{sig.code}|{sig.level}|{sig.economy}"
 
-    def filter_new(self, signals: List[Signal]) -> List[Signal]:
-        """Return only signals that should trigger a notification this run."""
-        now = datetime.now(timezone.utc)
+    @staticmethod
+    def _parse_dt(s: str) -> datetime:
+        """Parse an ISO datetime string, treating naive timestamps as UTC."""
+        dt = datetime.fromisoformat(s)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+
+    def _filter_new_at(self, signals: List[Signal], now: datetime) -> List[Signal]:
         new = []
         for sig in signals:
             k = self._key(sig)
@@ -80,33 +86,29 @@ class SignalHistory:
             if entry is None or not entry["active"]:
                 new.append(sig)
             else:
-                first_seen = datetime.fromisoformat(entry["first_seen"])
+                first_seen = self._parse_dt(entry["first_seen"])
                 age_days = (now - first_seen).total_seconds() / 86400
                 if age_days >= self._ttl_days:
                     new.append(sig)
         return new
 
-    def update(self, current_signals: List[Signal]) -> None:
-        """Update history with the current run's signals and save to disk."""
-        now_dt = datetime.now(timezone.utc)
-        now_str = now_dt.isoformat()
+    def _update_at(self, current_signals: List[Signal], now: datetime) -> None:
+        now_str = now.isoformat()
         current_keys = {self._key(s) for s in current_signals}
 
         for sig in current_signals:
             k = self._key(sig)
             entry = self._history.get(k)
             if entry is None or not entry["active"]:
-                # New or re-fired: start fresh
                 self._history[k] = {
                     "first_seen": now_str,
                     "last_seen": now_str,
                     "active": True,
                 }
             else:
-                first_seen = datetime.fromisoformat(entry["first_seen"])
-                age_days = (now_dt - first_seen).total_seconds() / 86400
+                first_seen = self._parse_dt(entry["first_seen"])
+                age_days = (now - first_seen).total_seconds() / 86400
                 if age_days >= self._ttl_days:
-                    # TTL expired — reset so next suppression window starts now
                     self._history[k] = {
                         "first_seen": now_str,
                         "last_seen": now_str,
@@ -115,9 +117,28 @@ class SignalHistory:
                 else:
                     self._history[k]["last_seen"] = now_str
 
-        # Mark signals that didn't fire this run as cleared
         for k in list(self._history):
             if self._history[k]["active"] and k not in current_keys:
                 self._history[k]["active"] = False
 
         self._save()
+
+    def filter_new(self, signals: List[Signal]) -> List[Signal]:
+        """Return only signals that should trigger a notification this run."""
+        return self._filter_new_at(signals, datetime.now(timezone.utc))
+
+    def update(self, current_signals: List[Signal]) -> None:
+        """Update history with the current run's signals and save to disk."""
+        self._update_at(current_signals, datetime.now(timezone.utc))
+
+    def filter_and_update(self, signals: List[Signal]) -> List[Signal]:
+        """Atomically filter new signals and update history with one shared timestamp.
+
+        Preferred over calling filter_new + update separately — using a single
+        timestamp prevents a race where the two calls straddle the TTL boundary,
+        which would reset first_seen without ever sending the re-notification.
+        """
+        now = datetime.now(timezone.utc)
+        new = self._filter_new_at(signals, now)
+        self._update_at(signals, now)
+        return new
