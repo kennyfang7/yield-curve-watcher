@@ -648,3 +648,53 @@ class TestFetchFredSeries:
         with patch("requests.get", return_value=mock_resp):
             with pytest.raises(req.HTTPError):
                 fetch_fred_series("BAD", "2024-01-01", "2024-01-31", "key")
+
+
+# ---------------------------------------------------------------------------
+# Scheduler
+# ---------------------------------------------------------------------------
+
+class TestScheduler:
+    def test_run_with_retry_succeeds_on_first_attempt(self):
+        """Happy path: pipeline succeeds, called exactly once."""
+        from ycw.scheduler import _run_with_retry
+
+        call_count = {"n": 0}
+
+        def mock_pipeline():
+            call_count["n"] += 1
+
+        _run_with_retry(mock_pipeline, retry_attempts=3, retry_delay_seconds=0)
+        assert call_count["n"] == 1
+
+    def test_run_with_retry_exhausts_retries_without_crashing(self):
+        """If pipeline always fails, retries retry_attempts times then returns."""
+        from ycw.scheduler import _run_with_retry
+
+        call_count = {"n": 0}
+
+        def always_fails():
+            call_count["n"] += 1
+            raise RuntimeError("FRED is down")
+
+        # Should not raise; should return after retry_attempts calls
+        _run_with_retry(always_fails, retry_attempts=3, retry_delay_seconds=0)
+        assert call_count["n"] == 3
+
+    def test_schedule_config_defaults(self, tmp_path):
+        """schedule: block absent → defaults applied by get_schedule_config()."""
+        from ycw.scheduler import get_schedule_config
+
+        # No schedule block at all
+        cfg_no_schedule = {}
+        s = get_schedule_config(cfg_no_schedule)
+        assert s["time"] == "08:00"
+        assert s["retry_attempts"] == 3
+        assert s["retry_delay_seconds"] == 60
+
+        # Partial schedule block — only time provided
+        cfg_partial = {"schedule": {"time": "09:30"}}
+        s2 = get_schedule_config(cfg_partial)
+        assert s2["time"] == "09:30"
+        assert s2["retry_attempts"] == 3
+        assert s2["retry_delay_seconds"] == 60
