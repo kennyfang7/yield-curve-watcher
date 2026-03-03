@@ -30,18 +30,22 @@ def build_registry():
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=["run"], help="run")
+    parser.add_argument("command", choices=["run", "schedule"], help="run | schedule")
     parser.add_argument("--config", required=True, help="Path to YAML config")
-    parser.add_argument("--json_out", default="", help="Write results JSON to this path")
+    parser.add_argument("--json_out", default="", help="Write results JSON to this path (run only)")
     args = parser.parse_args()
 
     cfg = load_config(args.config)
     reg = build_registry()
-    results = run_pipeline(reg, cfg)
 
-    if args.json_out:
-        with open(args.json_out, "w", encoding="utf-8") as f:
-            json.dump(results, f, indent=2)
+    if args.command == "schedule":
+        from .scheduler import run_scheduled
+        run_scheduled(reg, cfg)
+    else:
+        results = run_pipeline(reg, cfg)
+        if args.json_out:
+            with open(args.json_out, "w", encoding="utf-8") as f:
+                json.dump(results, f, indent=2)
 
 if __name__ == "__main__":
     main()
