@@ -5,3 +5,8 @@ indicators: ["yieldcurve", "credit_us"]
 signals: ["composite_default", "logit_recession"]
 notifier: "console"
 alert_ttl_days: 7  # re-notify after this many days of continuous signal activity
+
+schedule:
+  time: "08:00"           # 24hr local time to run daily
+  retry_attempts: 3       # number of retry attempts on failure
+  retry_delay_seconds: 60 # base delay in seconds; doubles each attempt
